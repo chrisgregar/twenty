@@ -13,6 +13,7 @@ import { PrismaService } from 'src/database/prisma.service';
 import { AbilityAction } from 'src/ability/ability.action';
 import { AppAbility } from 'src/ability/ability.factory';
 import { PipelineStageWhereInput } from 'src/core/@generated/pipeline-stage/pipeline-stage-where.input';
+import { UpdateOnePipelineStageArgs } from 'src/core/@generated/pipeline-stage/update-one-pipeline-stage.args';
 import { assert } from 'src/utils/assert';
 
 class PipelineStageArgs {
@@ -46,11 +47,53 @@ export class UpdatePipelineStageAbilityHandler implements IAbilityHandler {
 
   async handle(ability: AppAbility, context: ExecutionContext) {
     const gqlContext = GqlExecutionContext.create(context);
-    const args = gqlContext.getArgs<PipelineStageArgs>();
+    const args = gqlContext.getArgs<UpdateOnePipelineStageArgs>();
     const pipelineStage = await this.prismaService.pipelineStage.findFirst({
       where: args.where,
     });
     assert(pipelineStage, '', NotFoundException);
+
+    const relations = [
+      { name: 'pipeline', model: 'pipeline' },
+      { name: 'pipelineProgresses', model: 'pipelineProgress' },
+    ];
+    const relationNames = relations.map((item) => item.name);
+    const actions = ['set', 'disconnect', 'connect'];
+
+    for (const [key, arg] of Object.entries(args.data)) {
+      const index = relationNames.indexOf(key);
+
+      if (index !== -1) {
+        for (const action of actions) {
+          const model = relations[index].model;
+          if (!arg[action]) {
+            continue;
+          }
+
+          const array = !Array.isArray(arg[action])
+            ? [arg[action]]
+            : arg[action];
+          const ids = array.map((item) => item.id);
+
+          if (ids.lenght < 0) {
+            continue;
+          }
+
+          const items = await this.prismaService[model].findMany({
+            where: {
+              id: {
+                in: ids,
+              },
+              workspaceId: pipelineStage.workspaceId,
+            },
+          });
+
+          if (items.length !== ids.length) {
+            return false;
+          }
+        }
+      }
+    }
 
     return ability.can(
       AbilityAction.Update,
