@@ -14,6 +14,8 @@ import { AbilityAction } from 'src/ability/ability.action';
 import { AppAbility } from 'src/ability/ability.factory';
 import { assert } from 'src/utils/assert';
 import { PipelineProgressWhereInput } from 'src/core/@generated/pipeline-progress/pipeline-progress-where.input';
+import { checkRelationPermission } from 'src/ability/ability.util';
+import { UpdateOnePipelineProgressArgs } from 'src/core/@generated/pipeline-progress/update-one-pipeline-progress.args';
 
 class PipelineProgressArgs {
   where?: PipelineProgressWhereInput;
@@ -46,12 +48,32 @@ export class UpdatePipelineProgressAbilityHandler implements IAbilityHandler {
 
   async handle(ability: AppAbility, context: ExecutionContext) {
     const gqlContext = GqlExecutionContext.create(context);
-    const args = gqlContext.getArgs<PipelineProgressArgs>();
+    const args = gqlContext.getArgs<UpdateOnePipelineProgressArgs>();
     const pipelineProgress =
-      await this.prismaService.pipelineProgress.findFirst({
+      await this.prismaService.client.pipelineProgress.findFirst({
         where: args.where,
       });
     assert(pipelineProgress, '', NotFoundException);
+
+    await checkRelationPermission(this.prismaService, {
+      args,
+      relations: [
+        {
+          name: 'pipeline',
+          model: 'Pipeline',
+        },
+        {
+          name: 'pipelineStage',
+          model: 'PipelineStage',
+        },
+        {
+          name: 'pointOfContact',
+          model: 'Person',
+        },
+      ],
+      workspaceId: pipelineProgress.workspaceId,
+      operations: ['connect', 'disconnect'],
+    });
 
     return ability.can(
       AbilityAction.Update,
@@ -68,7 +90,7 @@ export class DeletePipelineProgressAbilityHandler implements IAbilityHandler {
     const gqlContext = GqlExecutionContext.create(context);
     const args = gqlContext.getArgs<PipelineProgressArgs>();
     const pipelineProgress =
-      await this.prismaService.pipelineProgress.findFirst({
+      await this.prismaService.client.pipelineProgress.findFirst({
         where: args.where,
       });
     assert(pipelineProgress, '', NotFoundException);

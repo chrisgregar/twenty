@@ -13,7 +13,9 @@ import { PrismaService } from 'src/database/prisma.service';
 import { AbilityAction } from 'src/ability/ability.action';
 import { AppAbility } from 'src/ability/ability.factory';
 import { PersonWhereInput } from 'src/core/@generated/person/person-where.input';
+import { UpdateOnePersonArgs } from 'src/core/@generated/person/update-one-person.args';
 import { assert } from 'src/utils/assert';
+import { checkRelationPermission } from 'src/ability/ability.util';
 
 class PersonArgs {
   where?: PersonWhereInput;
@@ -46,11 +48,27 @@ export class UpdatePersonAbilityHandler implements IAbilityHandler {
 
   async handle(ability: AppAbility, context: ExecutionContext) {
     const gqlContext = GqlExecutionContext.create(context);
-    const args = gqlContext.getArgs<PersonArgs>();
-    const person = await this.prismaService.person.findFirst({
+    const args = gqlContext.getArgs<UpdateOnePersonArgs>();
+    const person = await this.prismaService.client.person.findFirst({
       where: args.where,
     });
     assert(person, '', NotFoundException);
+
+    await checkRelationPermission(this.prismaService, {
+      args,
+      relations: [
+        {
+          name: 'company',
+          model: 'Company',
+        },
+        {
+          name: 'pipelineProgresses',
+          model: 'PipelineProgress',
+        },
+      ],
+      workspaceId: person.workspaceId,
+      operations: ['connect', 'set', 'disconnect'],
+    });
 
     return ability.can(AbilityAction.Update, subject('Person', person));
   }
@@ -63,7 +81,7 @@ export class DeletePersonAbilityHandler implements IAbilityHandler {
   async handle(ability: AppAbility, context: ExecutionContext) {
     const gqlContext = GqlExecutionContext.create(context);
     const args = gqlContext.getArgs<PersonArgs>();
-    const person = await this.prismaService.person.findFirst({
+    const person = await this.prismaService.client.person.findFirst({
       where: args.where,
     });
     assert(person, '', NotFoundException);

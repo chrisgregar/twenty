@@ -50,7 +50,7 @@ export class UpdateWorkspaceAbilityHandler implements IAbilityHandler {
     const request = getRequest(context);
     assert(request.user.workspace.id, '', ForbiddenException);
 
-    const workspace = await this.prismaService.workspace.findUnique({
+    const workspace = await this.prismaService.client.workspace.findUnique({
       where: { id: request.user.workspace.id },
     });
     assert(workspace, '', NotFoundException);
@@ -66,7 +66,7 @@ export class DeleteWorkspaceAbilityHandler implements IAbilityHandler {
   async handle(ability: AppAbility, context: ExecutionContext) {
     const gqlContext = GqlExecutionContext.create(context);
     const args = gqlContext.getArgs<WorksapceArgs>();
-    const workspace = await this.prismaService.workspace.findFirst({
+    const workspace = await this.prismaService.client.workspace.findFirst({
       where: args.where,
     });
     assert(workspace, '', NotFoundException);

@@ -13,7 +13,9 @@ import { PrismaService } from 'src/database/prisma.service';
 import { AbilityAction } from 'src/ability/ability.action';
 import { AppAbility } from 'src/ability/ability.factory';
 import { CommentThreadTargetWhereInput } from 'src/core/@generated/comment-thread-target/comment-thread-target-where.input';
+import { UpdateOneCommentThreadTargetArgs } from 'src/core/@generated/comment-thread-target/update-one-comment-thread-target.args';
 import { assert } from 'src/utils/assert';
+import { checkRelationPermission } from 'src/ability/ability.util';
 
 class CommentThreadTargetArgs {
   where?: CommentThreadTargetWhereInput;
@@ -52,12 +54,19 @@ export class UpdateCommentThreadTargetAbilityHandler
 
   async handle(ability: AppAbility, context: ExecutionContext) {
     const gqlContext = GqlExecutionContext.create(context);
-    const args = gqlContext.getArgs<CommentThreadTargetArgs>();
+    const args = gqlContext.getArgs<UpdateOneCommentThreadTargetArgs>();
     const commentThreadTarget =
-      await this.prismaService.commentThreadTarget.findFirst({
+      await this.prismaService.client.commentThreadTarget.findFirst({
         where: args.where,
       });
     assert(commentThreadTarget, '', NotFoundException);
+
+    await checkRelationPermission(this.prismaService, {
+      args,
+      relations: [{ name: 'commentThread', model: 'CommentThread' }],
+      workspaceId: commentThreadTarget.workspaceId,
+      operations: ['connect'],
+    });
 
     return ability.can(
       AbilityAction.Update,
@@ -76,7 +85,7 @@ export class DeleteCommentThreadTargetAbilityHandler
     const gqlContext = GqlExecutionContext.create(context);
     const args = gqlContext.getArgs<CommentThreadTargetArgs>();
     const commentThreadTarget =
-      await this.prismaService.commentThreadTarget.findFirst({
+      await this.prismaService.client.commentThreadTarget.findFirst({
         where: args.where,
       });
     assert(commentThreadTarget, '', NotFoundException);

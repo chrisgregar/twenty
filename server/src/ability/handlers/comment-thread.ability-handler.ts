@@ -13,7 +13,9 @@ import { PrismaService } from 'src/database/prisma.service';
 import { AbilityAction } from 'src/ability/ability.action';
 import { AppAbility } from 'src/ability/ability.factory';
 import { CommentThreadWhereInput } from 'src/core/@generated/comment-thread/comment-thread-where.input';
+import { UpdateOneCommentThreadArgs } from 'src/core/@generated/comment-thread/update-one-comment-thread.args';
 import { assert } from 'src/utils/assert';
+import { checkRelationPermission } from 'src/ability/ability.util';
 
 class CommentThreadArgs {
   where?: CommentThreadWhereInput;
@@ -46,11 +48,45 @@ export class UpdateCommentThreadAbilityHandler implements IAbilityHandler {
 
   async handle(ability: AppAbility, context: ExecutionContext) {
     const gqlContext = GqlExecutionContext.create(context);
-    const args = gqlContext.getArgs<CommentThreadArgs>();
-    const commentThread = await this.prismaService.commentThread.findFirst({
-      where: args.where,
-    });
+    const args = gqlContext.getArgs<UpdateOneCommentThreadArgs>();
+    const commentThread =
+      await this.prismaService.client.commentThread.findFirst({
+        where: args.where,
+      });
     assert(commentThread, '', NotFoundException);
+
+    await checkRelationPermission(this.prismaService, {
+      args,
+      relations: [
+        { name: 'comments', model: 'Comment' },
+        {
+          name: 'commentThreadTargets',
+          model: 'CommentThreadTarget',
+        },
+        {
+          name: 'auhtor',
+          model: 'User',
+        },
+        {
+          name: 'assigne',
+          model: 'User',
+        },
+        {
+          name: 'attachments',
+          model: 'Attachment',
+        },
+      ],
+      workspaceId: commentThread.workspaceId,
+      operations: [
+        'create',
+        'connectOrCreate',
+        'createMany',
+        'set',
+        'disconnect',
+        'delete',
+        'connect',
+      ],
+    });
 
     return ability.can(
       AbilityAction.Update,
@@ -66,9 +102,10 @@ export class DeleteCommentThreadAbilityHandler implements IAbilityHandler {
   async handle(ability: AppAbility, context: ExecutionContext) {
     const gqlContext = GqlExecutionContext.create(context);
     const args = gqlContext.getArgs<CommentThreadArgs>();
-    const commentThread = await this.prismaService.commentThread.findFirst({
-      where: args.where,
-    });
+    const commentThread =
+      await this.prismaService.client.commentThread.findFirst({
+        where: args.where,
+      });
     assert(commentThread, '', NotFoundException);
 
     return ability.can(

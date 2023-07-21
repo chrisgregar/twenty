@@ -14,6 +14,8 @@ import { AbilityAction } from 'src/ability/ability.action';
 import { AppAbility } from 'src/ability/ability.factory';
 import { WorkspaceMemberWhereInput } from 'src/core/@generated/workspace-member/workspace-member-where.input';
 import { assert } from 'src/utils/assert';
+import { checkRelationPermission } from 'src/ability/ability.util';
+import { UpdateOneWorkspaceMemberArgs } from 'src/core/@generated/workspace-member/update-one-workspace-member.args';
 
 class WorksapceMemberArgs {
   where?: WorkspaceMemberWhereInput;
@@ -46,11 +48,24 @@ export class UpdateWorkspaceMemberAbilityHandler implements IAbilityHandler {
 
   async handle(ability: AppAbility, context: ExecutionContext) {
     const gqlContext = GqlExecutionContext.create(context);
-    const args = gqlContext.getArgs<WorksapceMemberArgs>();
-    const workspaceMember = await this.prismaService.workspaceMember.findFirst({
-      where: args.where,
-    });
+    const args = gqlContext.getArgs<UpdateOneWorkspaceMemberArgs>();
+    const workspaceMember =
+      await this.prismaService.client.workspaceMember.findFirst({
+        where: args.where,
+      });
     assert(workspaceMember, '', NotFoundException);
+
+    await checkRelationPermission(this.prismaService, {
+      args,
+      relations: [
+        {
+          name: 'user',
+          model: 'User',
+        },
+      ],
+      workspaceId: workspaceMember.workspaceId,
+      operations: ['connect'],
+    });
 
     return ability.can(
       AbilityAction.Update,
@@ -66,9 +81,10 @@ export class DeleteWorkspaceMemberAbilityHandler implements IAbilityHandler {
   async handle(ability: AppAbility, context: ExecutionContext) {
     const gqlContext = GqlExecutionContext.create(context);
     const args = gqlContext.getArgs<WorksapceMemberArgs>();
-    const workspaceMember = await this.prismaService.workspaceMember.findFirst({
-      where: args.where,
-    });
+    const workspaceMember =
+      await this.prismaService.client.workspaceMember.findFirst({
+        where: args.where,
+      });
     assert(workspaceMember, '', NotFoundException);
 
     return ability.can(

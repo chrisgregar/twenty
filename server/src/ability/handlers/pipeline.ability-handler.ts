@@ -14,6 +14,8 @@ import { AbilityAction } from 'src/ability/ability.action';
 import { AppAbility } from 'src/ability/ability.factory';
 import { PipelineWhereInput } from 'src/core/@generated/pipeline/pipeline-where.input';
 import { assert } from 'src/utils/assert';
+import { checkRelationPermission } from 'src/ability/ability.util';
+import { UpdateOnePipelineArgs } from 'src/core/@generated/pipeline/update-one-pipeline.args';
 
 class PipelineArgs {
   where?: PipelineWhereInput;
@@ -46,11 +48,27 @@ export class UpdatePipelineAbilityHandler implements IAbilityHandler {
 
   async handle(ability: AppAbility, context: ExecutionContext) {
     const gqlContext = GqlExecutionContext.create(context);
-    const args = gqlContext.getArgs<PipelineArgs>();
-    const pipeline = await this.prismaService.pipeline.findFirst({
+    const args = gqlContext.getArgs<UpdateOnePipelineArgs>();
+    const pipeline = await this.prismaService.client.pipeline.findFirst({
       where: args.where,
     });
     assert(pipeline, '', NotFoundException);
+
+    await checkRelationPermission(this.prismaService, {
+      args,
+      relations: [
+        {
+          name: 'pipelineProgresses',
+          model: 'PipelineProgress',
+        },
+        {
+          name: 'pipelineStages',
+          model: 'PipelineStage',
+        },
+      ],
+      workspaceId: pipeline.workspaceId,
+      operations: ['connect', 'set', 'disconnect'],
+    });
 
     return ability.can(AbilityAction.Update, subject('Pipeline', pipeline));
   }
@@ -63,7 +81,7 @@ export class DeletePipelineAbilityHandler implements IAbilityHandler {
   async handle(ability: AppAbility, context: ExecutionContext) {
     const gqlContext = GqlExecutionContext.create(context);
     const args = gqlContext.getArgs<PipelineArgs>();
-    const pipeline = await this.prismaService.pipeline.findFirst({
+    const pipeline = await this.prismaService.client.pipeline.findFirst({
       where: args.where,
     });
     assert(pipeline, '', NotFoundException);

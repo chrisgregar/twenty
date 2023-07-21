@@ -47,9 +47,11 @@ export class UpdateRefreshTokenAbilityHandler implements IAbilityHandler {
   async handle(ability: AppAbility, context: ExecutionContext) {
     const gqlContext = GqlExecutionContext.create(context);
     const args = gqlContext.getArgs<RefreshTokenArgs>();
-    const refreshToken = await this.prismaService.refreshToken.findFirst({
-      where: args.where,
-    });
+    const refreshToken = await this.prismaService.client.refreshToken.findFirst(
+      {
+        where: args.where,
+      },
+    );
     assert(refreshToken, '', NotFoundException);
 
     return ability.can(
@@ -66,9 +68,11 @@ export class DeleteRefreshTokenAbilityHandler implements IAbilityHandler {
   async handle(ability: AppAbility, context: ExecutionContext) {
     const gqlContext = GqlExecutionContext.create(context);
     const args = gqlContext.getArgs<RefreshTokenArgs>();
-    const refreshToken = await this.prismaService.refreshToken.findFirst({
-      where: args.where,
-    });
+    const refreshToken = await this.prismaService.client.refreshToken.findFirst(
+      {
+        where: args.where,
+      },
+    );
     assert(refreshToken, '', NotFoundException);
 
     return ability.can(
